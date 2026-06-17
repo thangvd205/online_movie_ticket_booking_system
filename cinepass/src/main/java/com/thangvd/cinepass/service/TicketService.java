@@ -1,7 +1,10 @@
 package com.thangvd.cinepass.service;
 
 import com.thangvd.cinepass.exception.SeatAlreadyBookedException;
+import com.thangvd.cinepass.model.Seat;
+import com.thangvd.cinepass.model.Showtime;
 import com.thangvd.cinepass.model.Ticket;
+import com.thangvd.cinepass.repository.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -14,9 +17,13 @@ import java.time.LocalDateTime;
 public class TicketService {
     private final TicketRepository ticketRepository;
 
+    public TicketService(TicketRepository ticketRepository) {
+        this.ticketRepository = ticketRepository;
+    }
+
     @Transactional
     public Ticket bookTicket(Showtime showtime, Seat seat, Double price) {
-        boolean isSeatTaken = ticketRepository.existByShowtimeIdAndSeatId(showTime.getId(), seat.getId());
+        boolean isSeatTaken = ticketRepository.existsByShowtimeIdAndSeatId(showtime.getId(), seat.getId());
         if(isSeatTaken) {
             throw new SeatAlreadyBookedException("Ghế đã bị đặt, vui lòng chọn ghế khác!");
         }
