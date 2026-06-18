@@ -5,7 +5,6 @@ import com.thangvd.cinepass.model.Seat;
 import com.thangvd.cinepass.model.Showtime;
 import com.thangvd.cinepass.model.Ticket;
 import com.thangvd.cinepass.repository.TicketRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
-@RequiredArgsConstructor
+
 public class TicketService {
     private final TicketRepository ticketRepository;
 
@@ -36,11 +35,15 @@ public class TicketService {
         ticket.setStatus("CONFIRMED");
 
         try {
-
             return ticketRepository.save(ticket);
         }catch(DataIntegrityViolationException e) {
-
-            throw new SeatAlreadyBookedException("Ghế đã có người đặt, vui lòng chọn ghế khác!");
+            String rootMessage = e.getRootCause() != null ? e.getRootCause().getMessage(): "";
+//            lỗi từ db chứa từ khóa liên quan uniqueConstraint
+            if (rootMessage.contains("UQ") || rootMessage.contains("unique") || rootMessage.contains("duplicate")) {
+                throw new SeatAlreadyBookedException("Ghế đã có người đặt, vui lòng chọn ghế khác!");
+            }
+//            lỗi do nguyên nhân khác
+            throw new IllegalArgumentException("Dữ liệu không hợp lệ(Suất chiếu hoặc ghế không tồn tại!");
         }
     }
 }

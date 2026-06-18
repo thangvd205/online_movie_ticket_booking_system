@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Table(name = "tickets", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"showtime_id", "seat_id"})
 })
-
 @Getter
 @Setter
 public class Ticket {

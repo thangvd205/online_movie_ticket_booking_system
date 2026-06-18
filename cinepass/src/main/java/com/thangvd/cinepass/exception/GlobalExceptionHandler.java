@@ -11,10 +11,12 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+//    bất kỳ tầng nào trong Service ném ra SeatAlreadyBookedException, hàm này sẽ tự động kích hoạt để bắt lấy nó
     @ExceptionHandler(SeatAlreadyBookedException.class)
     public ResponseEntity<Map<String, String>> handleSeatAlreadyBooked(SeatAlreadyBookedException ex) {
         Map<String, String> errors = new HashMap<>();
-        errors.clear();;
+
         errors.put("Error", "Đặt ghế bị trùng");
         errors.put("message", ex.getMessage());
 
