@@ -33,7 +33,11 @@ public class Ticket {
 
     private LocalDateTime expiryTime; // tgian het han dat ve
 
+    private String bookingCode;
 
+
+
+//    getter & setter
     public Long getId() {
         return id;
     }
@@ -88,5 +92,13 @@ public class Ticket {
 
     public void setExpiryTime(LocalDateTime expiryTime) {
         this.expiryTime = expiryTime;
+    }
+
+    public String getBookingCode() {
+        return bookingCode;
+    }
+
+    public void setBookingCode(String bookingCode) {
+        this.bookingCode = bookingCode;
     }
 }

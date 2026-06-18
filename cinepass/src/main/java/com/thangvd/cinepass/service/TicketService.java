@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 
@@ -41,5 +42,26 @@ public class TicketService {
         } catch (DataIntegrityViolationException e) {
             throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");
         }
+    }
+
+    @Transactional
+    public Ticket confirmePayment(Long ticketId) {
+
+        Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new RuntimeException("Không tìm thấy vé đã đặt!"));
+
+//        kiểm tra vé còn trong thời gian holding không
+        if("HOLDING".equals(ticket.getStatus()) && ticket.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Thời gian đặt vé đã hết, vui lòng thực hiện lại!");
+        }
+
+//        cập nhật trạng thái và sinh mã vé
+        ticket.setStatus("CONFIRMED");
+
+//        sinh mã ngẫu nhiên với 6 ký tự
+        String randomCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        ticket.setBookingCode("CT-" + randomCode);
+
+//        lưu lại vào db
+        return ticketRepository.save(ticket);
     }
 }
