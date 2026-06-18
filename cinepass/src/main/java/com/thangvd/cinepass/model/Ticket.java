@@ -31,6 +31,8 @@ public class Ticket {
     private String status;
     private Double price;
 
+    private LocalDateTime expiryTime; // tgian het han dat ve
+
 
     public Long getId() {
         return id;
@@ -78,5 +80,13 @@ public class Ticket {
 
     public void setPrice(Double price) {
         this.price = price;
+    }
+
+    public LocalDateTime getExpiryTime() {
+        return expiryTime;
+    }
+
+    public void setExpiryTime(LocalDateTime expiryTime) {
+        this.expiryTime = expiryTime;
     }
 }

@@ -26,24 +26,20 @@ public class TicketService {
         if(isSeatTaken) {
             throw new SeatAlreadyBookedException("Ghế đã bị đặt, vui lòng chọn ghế khác!");
         }
-
+//        tạo đối tượng ticket trạng thái giữ chỗ
         Ticket ticket = new Ticket();
         ticket.setShowtime(showtime);
         ticket.setSeat(seat);
         ticket.setPrice(price);
         ticket.setBookingTime(LocalDateTime.now());
-        ticket.setStatus("CONFIRMED");
+        ticket.setStatus("HOLDING");
+        ticket.setExpiryTime(LocalDateTime.now().plusMinutes(1)); // trạng thái chờ người dùng đặt vé trong 1 phút
 
         try {
+//            lưu xuống db
             return ticketRepository.save(ticket);
-        }catch(DataIntegrityViolationException e) {
-            String rootMessage = e.getRootCause() != null ? e.getRootCause().getMessage(): "";
-//            lỗi từ db chứa từ khóa liên quan uniqueConstraint
-            if (rootMessage.contains("UQ") || rootMessage.contains("unique") || rootMessage.contains("duplicate")) {
-                throw new SeatAlreadyBookedException("Ghế đã có người đặt, vui lòng chọn ghế khác!");
-            }
-//            lỗi do nguyên nhân khác
-            throw new IllegalArgumentException("Dữ liệu không hợp lệ(Suất chiếu hoặc ghế không tồn tại!");
+        } catch (DataIntegrityViolationException e) {
+            throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");
         }
     }
 }

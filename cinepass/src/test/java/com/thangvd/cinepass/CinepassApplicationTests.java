@@ -5,6 +5,7 @@ import com.thangvd.cinepass.model.Seat;
 import com.thangvd.cinepass.model.Showtime;
 import com.thangvd.cinepass.repository.SeatRepository;
 import com.thangvd.cinepass.repository.ShowtimeRepository;
+import com.thangvd.cinepass.repository.TicketRepository;
 import com.thangvd.cinepass.service.TicketService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ class CinepassApplicationTests {
 
     @Autowired
     private SeatRepository seatRepository;
+
+    @Autowired
+    private TicketRepository ticketRepository;
 
 	@Test
 	void testConcurrenBooking() throws InterruptedException {
@@ -68,6 +72,8 @@ class CinepassApplicationTests {
 //        in kết quả
         System.out.println("Số ghế đặt thành công: " + successCount.get());
         System.out.println("Số lượng bị chặn(đặt ghế bị trùng lặp): " + faildCount.get());
-	}
 
+        long ticketCount = ticketRepository.count();
+        org.junit.jupiter.api.Assertions.assertEquals(1, ticketCount, "Thất bại: Số lượng vé lưu trong DB phải đúng bằng 1!");
+	}
 }
