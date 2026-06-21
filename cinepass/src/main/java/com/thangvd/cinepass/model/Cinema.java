@@ -14,10 +14,10 @@ public class Cinema {
     private Long id;
 
 //    ép kiểu để lưu tên rạp tiếng việt không bị lỗi
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(name = "name", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String name;
 
-    @Column(name = "address", nullable = false, length = 300)
+    @Column(name = "address", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String address;
 
 //    (1)cinemas-(N)room

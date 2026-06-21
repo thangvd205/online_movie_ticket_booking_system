@@ -26,7 +26,7 @@ public class Showtime {
 
     private Room room;
 
-    @Column(name = "movie_title", nullable = false)
+    @Column(name = "movie_title", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String movieTitle;
 
     public Long getId() {

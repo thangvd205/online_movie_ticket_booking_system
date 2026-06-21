@@ -1,4 +1,3 @@
--- 1. Xóa sạch dữ liệu cũ
 DELETE FROM tickets;
 DELETE FROM showtimes;
 DELETE FROM seat;

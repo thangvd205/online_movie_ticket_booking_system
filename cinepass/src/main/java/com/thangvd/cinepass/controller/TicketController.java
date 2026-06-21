@@ -4,6 +4,7 @@ package com.thangvd.cinepass.controller;
 import com.thangvd.cinepass.dto.SeatStatusResponse;
 import com.thangvd.cinepass.dto.TicketResponse;
 import com.thangvd.cinepass.model.Ticket;
+import com.thangvd.cinepass.repository.TicketRepository;
 import com.thangvd.cinepass.service.TicketService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,18 +20,28 @@ import java.util.Map;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketRepository ticketRepository;
 
-    public TicketController(TicketService ticketService) {
+    public TicketController(TicketService ticketService,
+                            TicketRepository ticketRepository) {
         this.ticketService = ticketService;
+        this.ticketRepository = ticketRepository;
     }
 
 //    1. api xác nhận thanh toán thành công -> đổi trạng thái sang CONFIRMED và xuất vé điện tử
-    @PostMapping("/tickets/{id}/confirm")
-    public ResponseEntity<TicketResponse> confirmPayment(@PathVariable("id") Long ticketId) {
-        Ticket confirmedTicket = ticketService.confirmePayment(ticketId);
+    @PostMapping(value = "/tickets/{id}/confirm", produces = "application/json;charset=UTF-8")
+    public ResponseEntity<?> confirmPayment(@PathVariable("id") Long ticketId) {
+        try {
+            Ticket confirmedTicket = ticketService.confirmePayment(ticketId);
+            return ResponseEntity.ok(new TicketResponse(confirmedTicket));
 
-//        bọc thực thể vào DTO sạch để trả về bằng chứng đặt vé đầy đủ thông tin
-        return ResponseEntity.ok(new TicketResponse(confirmedTicket));
+        }catch (RuntimeException ex) {
+            Ticket ticket = ticketRepository.findById(ticketId).orElse(null);
+            if (ticket != null) {
+                return ResponseEntity.ok(new TicketResponse(ticket));
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+        }
     }
 
 //    2. api lấy sơ đồ ghế sáng(AVAILABLE)/vàng(HOLDING)/tối(CONFIRMED) của suất chiếu
@@ -39,6 +50,18 @@ public class TicketController {
         List<SeatStatusResponse> seatLayout = ticketService.getSeatFlowByShowtime(showtimeId);
         return ResponseEntity.ok(seatLayout);
     }
+
+
+//    3. api lấy toàn bộ lịch sử vé đã đặt của người dùng
+    @GetMapping("/tickets/history")
+    public ResponseEntity<List<TicketResponse>> getTicketHistory(@RequestParam("userId") Long userId) {
+        List<Ticket> tickets = ticketRepository.findByUserIdOrderByIdDesc(userId);
+
+        List<TicketResponse> result =   tickets.stream().map(TicketResponse::new).toList();
+
+        return ResponseEntity.ok(result);
+    }
+
 
 //    bắt lỗi RuntimeException xảy ra trong controller, hàm sẽ tự động kích hoạt
     @ExceptionHandler(RuntimeException.class)

@@ -35,6 +35,8 @@ public class Ticket {
 
     private String bookingCode;
 
+    private Long userId;
+
 
 
 //    getter & setter
@@ -100,5 +102,13 @@ public class Ticket {
 
     public void setBookingCode(String bookingCode) {
         this.bookingCode = bookingCode;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 }

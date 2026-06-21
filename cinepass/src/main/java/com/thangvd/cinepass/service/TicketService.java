@@ -54,6 +54,7 @@ public class TicketService {
 
         try {
 //            lưu xuống db
+            ticket.setUserId(1L);
             return ticketRepository.save(ticket);
         } catch (DataIntegrityViolationException e) {
             throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");

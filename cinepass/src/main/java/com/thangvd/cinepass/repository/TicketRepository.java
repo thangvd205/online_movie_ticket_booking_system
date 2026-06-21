@@ -23,4 +23,14 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     @Query("SELECT t FROM Ticket t WHERE t.showtime.id = :showtimeId " +
             "AND (t.status = 'CONFIRMED' OR (t.status = 'HOLDING' AND t.expiryTime > :now))")
     List<Ticket> findValidTicketsByShowtime(@Param("showtimeId") Long ShowtimeId, @Param("now") LocalDateTime now);
+
+
+//    lịch sử vé của người dùng
+    List<Ticket> findByUserIdOrderByIdDesc(Long userId);
+//    tìm các vé quá hạn để xử lý logic
+    List<Ticket> findByStatusAndBookingTimeBefore(String status, LocalDateTime time);
+//    tối ưu perform: ép trạng thái vé hết hạn hàng loạt
+    @Modifying
+    @Query("UPDATE Ticket t SET t.status = 'CANCELLED' WHERE t.status = 'HOLDING' AND t.bookingTime < :threshold")
+    int cancelExpiredTicketsBulk(@Param("threshold") LocalDateTime threshold);
 }
