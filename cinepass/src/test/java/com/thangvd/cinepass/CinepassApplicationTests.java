@@ -1,8 +1,12 @@
 package com.thangvd.cinepass;
 
 import com.thangvd.cinepass.exception.SeatAlreadyBookedException;
+import com.thangvd.cinepass.model.Cinema;
+import com.thangvd.cinepass.model.Room;
 import com.thangvd.cinepass.model.Seat;
 import com.thangvd.cinepass.model.Showtime;
+import com.thangvd.cinepass.repository.CinemaRepository;
+import com.thangvd.cinepass.repository.RoomRepository;
 import com.thangvd.cinepass.repository.SeatRepository;
 import com.thangvd.cinepass.repository.ShowtimeRepository;
 import com.thangvd.cinepass.repository.TicketRepository;
@@ -25,6 +29,10 @@ class CinepassApplicationTests {
     @Autowired
     private TicketService ticketService;
     @Autowired
+    private CinemaRepository cinemaRepository;
+    @Autowired
+    private RoomRepository roomRepository;
+    @Autowired
     private ShowtimeRepository showtimeRepository;
     @Autowired
     private SeatRepository seatRepository;
@@ -40,16 +48,34 @@ class CinepassApplicationTests {
         ticketRepository.deleteAll();
         showtimeRepository.deleteAll();
         seatRepository.deleteAll();
+        roomRepository.deleteAll();
+        cinemaRepository.deleteAll();
 
-        // Tự tạo dữ liệu mồi mới tinh, không phụ thuộc vào ID = 1 bên ngoài DB nữa
+        // Tạo Cinema trước
+        Cinema cinema = new Cinema();
+        cinema.setName("CinePass Cinema 2026");
+        cinema.setAddress("123 Đường Phố, TP HCM");
+        Cinema savedCinema = cinemaRepository.save(cinema);
+
+        // Tạo Room với Cinema
+        Room room = new Room();
+        room.setName("Phòng A");
+        room.setTotalseats(100);
+        room.setCinema(savedCinema);
+        Room savedRoom = roomRepository.save(room);
+
+        // Tạo Showtime với Room
         Showtime dummyShowtime = new Showtime();
         dummyShowtime.setMovieTitle("Phim Bom Tấn CinePass 2026");
         dummyShowtime.setStartTime(LocalDateTime.now());
-        this.savedShowtime = showtimeRepository.save(dummyShowtime); // DB tự sinh ID bao nhiêu ta dùng bấy nhiêu
+        dummyShowtime.setRoom(savedRoom); // Thiết lập Room
+        this.savedShowtime = showtimeRepository.save(dummyShowtime);
 
+        // Tạo Seat với Room
         Seat dummySeat = new Seat();
         dummySeat.setSeatNumber("A1");
         dummySeat.setSeatType("VIP");
+        dummySeat.setRoom(savedRoom); // Thiết lập Room
         this.savedSeat = seatRepository.save(dummySeat);
     }
 
@@ -109,6 +135,11 @@ class CinepassApplicationTests {
     @AfterEach
     void tearDown() {
         // Chạy xong xóa sạch dữ liệu mồi, trả lại môi trường DB sạch sẽ cho các ca test khác
+        // Xóa theo thứ tự: Ticket -> Showtime -> Seat -> Room -> Cinema (do khóa ngoại)
         ticketRepository.deleteAll();
+        showtimeRepository.deleteAll();
+        seatRepository.deleteAll();
+        roomRepository.deleteAll();
+        cinemaRepository.deleteAll();
     }
 }
