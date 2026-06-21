@@ -25,7 +25,7 @@ public class AuthService {
 
     public AppUser register(String username, String rawPassword) {
         if (userRepository.findByUsername(username).isPresent()) {
-            throw new RuntimeException("Username already taken");
+            throw new RuntimeException("Tên người dùng đã tồn tại");
         }
         AppUser user = new AppUser();
         user.setUsername(username);

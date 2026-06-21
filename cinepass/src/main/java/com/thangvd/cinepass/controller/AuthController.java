@@ -20,7 +20,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthRequest req) {
         AppUser user = authService.register(req.getUsername(), req.getPassword());
-        return ResponseEntity.ok().body("ok");
+        return ResponseEntity.ok().body("Đăng ký thành công người dùng: " + user.getUsername());
     }
 
     @PostMapping("/login")
