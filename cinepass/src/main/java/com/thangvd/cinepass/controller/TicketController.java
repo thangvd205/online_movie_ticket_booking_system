@@ -2,8 +2,11 @@ package com.thangvd.cinepass.controller;
 
 
 import com.thangvd.cinepass.dto.SeatStatusResponse;
+import com.thangvd.cinepass.dto.TicketRequest;
 import com.thangvd.cinepass.dto.TicketResponse;
+import com.thangvd.cinepass.model.Showtime;
 import com.thangvd.cinepass.model.Ticket;
+import com.thangvd.cinepass.repository.ShowtimeRepository;
 import com.thangvd.cinepass.repository.TicketRepository;
 import com.thangvd.cinepass.service.TicketService;
 import org.springframework.http.HttpStatus;
@@ -21,11 +24,37 @@ public class TicketController {
 
     private final TicketService ticketService;
     private final TicketRepository ticketRepository;
+    private final ShowtimeRepository showtimeRepository;
 
     public TicketController(TicketService ticketService,
-                            TicketRepository ticketRepository) {
+                            TicketRepository ticketRepository,
+                            ShowtimeRepository showtimeRepository) {
         this.ticketService = ticketService;
         this.ticketRepository = ticketRepository;
+        this.showtimeRepository = showtimeRepository;
+    }
+
+//    0. api lấy danh sách suất chiếu (để xác định showtimeId chính xác)
+    @GetMapping("/showtimes")
+    public ResponseEntity<List<Showtime>> getAllShowtimes() {
+        List<Showtime> showtimes = showtimeRepository.findAll();
+        return ResponseEntity.ok(showtimes);
+    }
+
+//    0. api đặt vé (booking ticket)
+    @PostMapping(value = "/tickets/book", produces = "application/json;charset=UTF-8")
+    public ResponseEntity<?> bookTicket(@RequestBody TicketRequest request) {
+        try {
+            Ticket ticket = ticketService.bookTicketByIds(
+                    request.getShowtimeId(),
+                    request.getSeatId(),
+                    request.getPrice(),
+                    request.getUserId()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(new TicketResponse(ticket));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        }
     }
 
 //    1. api xác nhận thanh toán thành công -> đổi trạng thái sang CONFIRMED và xuất vé điện tử

@@ -5,17 +5,14 @@ import com.thangvd.cinepass.model.Cinema;
 import com.thangvd.cinepass.model.Room;
 import com.thangvd.cinepass.model.Seat;
 import com.thangvd.cinepass.model.Showtime;
-import com.thangvd.cinepass.repository.CinemaRepository;
-import com.thangvd.cinepass.repository.RoomRepository;
-import com.thangvd.cinepass.repository.SeatRepository;
-import com.thangvd.cinepass.repository.ShowtimeRepository;
-import com.thangvd.cinepass.repository.TicketRepository;
+import com.thangvd.cinepass.repository.*;
 import com.thangvd.cinepass.service.TicketService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
@@ -42,45 +39,46 @@ class CinepassApplicationTests {
     private Showtime savedShowtime;
     private Seat savedSeat;
 
-    @BeforeEach
-    void setUpData() {
-        // Bản chất: Trước mỗi ca test, dọn sạch dữ liệu cũ để tránh lỗi trùng lặp khóa hoặc sai lệch count()
-        ticketRepository.deleteAll();
-        showtimeRepository.deleteAll();
-        seatRepository.deleteAll();
-        roomRepository.deleteAll();
-        cinemaRepository.deleteAll();
+     @Transactional
+     @BeforeEach
+     void setUpData() {
+          // ✅ Xóa sạch dữ liệu từ lần chạy trước để tránh accumulation
+         ticketRepository.deleteAll();
+         showtimeRepository.deleteAll();
+         seatRepository.deleteAll();
+         roomRepository.deleteAll();
+         cinemaRepository.deleteAll();
 
-        // Tạo Cinema trước
-        Cinema cinema = new Cinema();
-        cinema.setName("CinePass Cinema 2026");
-        cinema.setAddress("123 Đường Phố, TP HCM");
-        Cinema savedCinema = cinemaRepository.save(cinema);
+          // Tạo Cinema trước
+         Cinema cinema = new Cinema();
+         cinema.setName("CinePass Cinema 2026");
+         cinema.setAddress("123 Đường Phố, TP HCM");
+         Cinema savedCinema = cinemaRepository.save(cinema);
 
-        // Tạo Room với Cinema
-        Room room = new Room();
-        room.setName("Phòng A");
-        room.setTotalseats(100);
-        room.setCinema(savedCinema);
-        Room savedRoom = roomRepository.save(room);
+         // Tạo Room với Cinema
+         Room room = new Room();
+         room.setName("Phòng A");
+         room.setTotalseats(100);
+         room.setCinema(savedCinema);
+         Room savedRoom = roomRepository.save(room);
 
-        // Tạo Showtime với Room
-        Showtime dummyShowtime = new Showtime();
-        dummyShowtime.setMovieTitle("Phim Bom Tấn CinePass 2026");
-        dummyShowtime.setStartTime(LocalDateTime.now());
-        dummyShowtime.setRoom(savedRoom); // Thiết lập Room
-        this.savedShowtime = showtimeRepository.save(dummyShowtime);
+         // Tạo Showtime với Room
+         Showtime dummyShowtime = new Showtime();
+         dummyShowtime.setMovieTitle("Phim Bom Tấn CinePass 2026");
+         dummyShowtime.setStartTime(LocalDateTime.now());
+         dummyShowtime.setRoom(savedRoom); // Thiết lập Room
+         this.savedShowtime = showtimeRepository.save(dummyShowtime);
 
-        // Tạo Seat với Room
-        Seat dummySeat = new Seat();
-        dummySeat.setSeatNumber("A1");
-        dummySeat.setSeatType("VIP");
-        dummySeat.setRoom(savedRoom); // Thiết lập Room
-        this.savedSeat = seatRepository.save(dummySeat);
-    }
+         // Tạo Seat với Room
+         Seat dummySeat = new Seat();
+         dummySeat.setSeatNumber("A1");
+         dummySeat.setSeatType("VIP");
+         dummySeat.setRoom(savedRoom); // Thiết lập Room
+         this.savedSeat = seatRepository.save(dummySeat);
+     }
 
-    @Test
-    void testConcurrentBooking() throws InterruptedException {
+     @Test
+     void testConcurrentBooking() throws InterruptedException {
         // Kiểm tra log để chắc chắn data mồi đã lên
         System.out.println("====== ĐÃ KHỞI TẠO SHOWTIME ID THỰC TẾ: " + savedShowtime.getId());
 
@@ -127,19 +125,20 @@ class CinepassApplicationTests {
         System.out.println("Số ghế đặt thành công: " + successCount.get());
         System.out.println("Số lượng bị chặn (đặt ghế bị trùng lặp): " + faildCount.get());
 
-        // Kiểm tra tính toàn vẹn dữ liệu: Hệ thống chịu tải đa luồng chuẩn thì chỉ được phép có duy nhất 1 vé tạo thành công
-        long ticketCount = ticketRepository.count();
-        org.junit.jupiter.api.Assertions.assertEquals(1, ticketCount, "Thất bại: Số lượng vé lưu trong DB phải đúng bằng 1!");
-    }
+         // Kiểm tra tính toàn vẹn dữ liệu: Hệ thống chịu tải đa luồng chuẩn thì chỉ được phép có duy nhất 1 vé tạo thành công
+         long ticketCount = ticketRepository.count();
+         org.junit.jupiter.api.Assertions.assertEquals(1, ticketCount, "Thất bại: Số lượng vé lưu trong DB phải đúng bằng 1!");
+     }
 
-    @AfterEach
-    void tearDown() {
-        // Chạy xong xóa sạch dữ liệu mồi, trả lại môi trường DB sạch sẽ cho các ca test khác
-        // Xóa theo thứ tự: Ticket -> Showtime -> Seat -> Room -> Cinema (do khóa ngoại)
-        ticketRepository.deleteAll();
-        showtimeRepository.deleteAll();
-        seatRepository.deleteAll();
-        roomRepository.deleteAll();
-        cinemaRepository.deleteAll();
-    }
+     @Transactional
+     @AfterEach
+     void tearDown() {
+         // Xóa sạch dữ liệu mồi sau mỗi test
+         ticketRepository.deleteAll();
+         showtimeRepository.deleteAll();
+         seatRepository.deleteAll();
+         roomRepository.deleteAll();
+         cinemaRepository.deleteAll();
+     }
+
 }

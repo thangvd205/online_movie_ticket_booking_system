@@ -5,6 +5,7 @@ import com.thangvd.cinepass.model.Ticket;
 import java.time.LocalDateTime;
 
 public class TicketResponse {
+    private Long id;
     private String bookingCode;
     private String movieTitle;
     private String cinemaName;
@@ -14,9 +15,12 @@ public class TicketResponse {
     private Double price;
     private LocalDateTime bookingTime;
     private LocalDateTime startTime;
+    private String status;
+    private LocalDateTime expiryTime;
 
 //  chuyển đổi từ Entity sang DTO response sạch sẽ
 public TicketResponse(Ticket ticket) {
+    this.id = ticket.getId();
     this.bookingCode = ticket.getBookingCode();
     this.movieTitle = ticket.getShowtime().getMovieTitle();
     this.cinemaName = ticket.getShowtime().getRoom().getCinema().getName();
@@ -26,9 +30,19 @@ public TicketResponse(Ticket ticket) {
     this.price = ticket.getPrice();
     this.bookingTime = ticket.getBookingTime();
     this.startTime = ticket.getShowtime().getStartTime();
+    this.status = ticket.getStatus();
+    this.expiryTime = ticket.getExpiryTime();
     }
 
 //    getter & setter
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public String getBookingCode() {
         return bookingCode;
@@ -100,5 +114,21 @@ public TicketResponse(Ticket ticket) {
 
     public void setStartTime(LocalDateTime startTime) {
         this.startTime = startTime;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getExpiryTime() {
+        return expiryTime;
+    }
+
+    public void setExpiryTime(LocalDateTime expiryTime) {
+        this.expiryTime = expiryTime;
     }
 }

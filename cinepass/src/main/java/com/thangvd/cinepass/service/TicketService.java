@@ -39,6 +39,12 @@ public class TicketService {
 
     @Transactional
     public Ticket bookTicket(Showtime showtime, Seat seat, Double price) {
+        // Reload với pessimistic lock để ngăn race condition
+        showtime = showtimeRepository.findByIdWithLock(showtime.getId())
+                .orElseThrow(() -> new RuntimeException("Suất chiếu không hợp lệ!"));
+        seat = seatRepository.findByIdWithLock(seat.getId())
+                .orElseThrow(() -> new RuntimeException("Ghế không hợp lệ!"));
+        
         boolean isSeatTaken = ticketRepository.existsByShowtimeIdAndSeatId(showtime.getId(), seat.getId());
         if(isSeatTaken) {
             throw new SeatAlreadyBookedException("Ghế đã bị đặt, vui lòng chọn ghế khác!");
@@ -55,6 +61,36 @@ public class TicketService {
         try {
 //            lưu xuống db
             ticket.setUserId(1L);
+            return ticketRepository.save(ticket);
+        } catch (DataIntegrityViolationException e) {
+            throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");
+        }
+    }
+
+        @Transactional
+    public Ticket bookTicketByIds(Long showtimeId, Long seatId, Double price, Long userId) {
+        // Dùng pessimistic lock để ngăn race condition giữa 2 luồng
+        Showtime showtime = showtimeRepository.findByIdWithLock(showtimeId)
+                .orElseThrow(() -> new RuntimeException("Suất chiếu không hợp lệ!"));
+        
+        Seat seat = seatRepository.findByIdWithLock(seatId)
+                .orElseThrow(() -> new RuntimeException("Ghế không hợp lệ!"));
+
+        boolean isSeatTaken = ticketRepository.existsByShowtimeIdAndSeatId(showtimeId, seatId);
+        if(isSeatTaken) {
+            throw new SeatAlreadyBookedException("Ghế đã bị đặt, vui lòng chọn ghế khác!");
+        }
+
+        Ticket ticket = new Ticket();
+        ticket.setShowtime(showtime);
+        ticket.setSeat(seat);
+        ticket.setPrice(price);
+        ticket.setBookingTime(LocalDateTime.now());
+        ticket.setStatus("HOLDING");
+        ticket.setExpiryTime(LocalDateTime.now().plusMinutes(15)); // 15 phút để hoàn tất thanh toán
+
+        try {
+            ticket.setUserId(userId);
             return ticketRepository.save(ticket);
         } catch (DataIntegrityViolationException e) {
             throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");
