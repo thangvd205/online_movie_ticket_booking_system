@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.thangvd.cinepass.security.JwtUserPrincipal;
 
 @RestController
 @RequestMapping("/api")
@@ -45,11 +48,20 @@ public class TicketController {
     @PostMapping(value = "/tickets/book", produces = "application/json;charset=UTF-8")
     public ResponseEntity<?> bookTicket(@RequestBody TicketRequest request) {
         try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = null;
+            if (auth != null && auth.getPrincipal() instanceof JwtUserPrincipal jp) {
+                userId = jp.id();
+            }
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+            }
+
             Ticket ticket = ticketService.bookTicketByIds(
                     request.getShowtimeId(),
                     request.getSeatId(),
                     request.getPrice(),
-                    request.getUserId()
+                    userId
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(new TicketResponse(ticket));
         } catch (RuntimeException ex) {
@@ -83,11 +95,18 @@ public class TicketController {
 
 //    3. api lấy toàn bộ lịch sử vé đã đặt của người dùng
     @GetMapping("/tickets/history")
-    public ResponseEntity<List<TicketResponse>> getTicketHistory(@RequestParam("userId") Long userId) {
+    public ResponseEntity<List<TicketResponse>> getTicketHistory() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long userId = null;
+        if (auth != null && auth.getPrincipal() instanceof JwtUserPrincipal jp) {
+            userId = jp.id();
+        }
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         List<Ticket> tickets = ticketRepository.findByUserIdOrderByIdDesc(userId);
-
-        List<TicketResponse> result =   tickets.stream().map(TicketResponse::new).toList();
-
+        List<TicketResponse> result = tickets.stream().map(TicketResponse::new).toList();
         return ResponseEntity.ok(result);
     }
 
