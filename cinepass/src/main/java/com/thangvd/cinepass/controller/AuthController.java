@@ -4,6 +4,7 @@ import com.thangvd.cinepass.dto.AuthRequest;
 import com.thangvd.cinepass.dto.AuthResponse;
 import com.thangvd.cinepass.model.AppUser;
 import com.thangvd.cinepass.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +19,14 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody AuthRequest req) {
+    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest req) {
         AppUser user = authService.register(req.getUsername(), req.getPassword());
         return ResponseEntity.ok().body("Đăng ký thành công người dùng: " + user.getUsername());
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest req) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest req) {
         String token = authService.login(req.getUsername(), req.getPassword());
         return ResponseEntity.ok(new AuthResponse(token));
     }
 }
-

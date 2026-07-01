@@ -1,7 +1,9 @@
 package com.thangvd.cinepass.service;
 
 import com.thangvd.cinepass.dto.SeatStatusResponse;
+import com.thangvd.cinepass.exception.ResourceNotFoundException;
 import com.thangvd.cinepass.exception.SeatAlreadyBookedException;
+import com.thangvd.cinepass.exception.TicketAccessDeniedException;
 import com.thangvd.cinepass.model.Seat;
 import com.thangvd.cinepass.model.Showtime;
 import com.thangvd.cinepass.model.Ticket;
@@ -22,57 +24,37 @@ import java.util.stream.Collectors;
 @Service
 
 public class TicketService {
+
+    //tính giá theo hàng ghế, tính ở server thay vì client gửi lên để tránh gian lận
+    private static final Map<String, Double> SEAT_TYPE_PRICE = Map.of(
+            "REGULAR", 80000.0,
+            "VIP", 150000.0,
+            "COUPLE", 310000.0
+    );
+    private static final Double DEFAULT_SEAT_PRICE = 80000.0;
+    private static final long HOLD_MINUTES = 15; // thời gian giữ chỗ chờ thanh toán là 15 phút
+
     private final TicketRepository ticketRepository;
-    private final SeatRepository seatRepository;
     private final ShowtimeRepository showtimeRepository;
+    private final SeatRepository seatRepository;
 
-
-    public TicketService(TicketRepository ticketRepository,
-                         SeatRepository seatRepository,
-                         ShowtimeRepository showtimeRepository) {
-
+    public TicketService(TicketRepository ticketRepository, ShowtimeRepository showtimeRepository, SeatRepository seatRepository) {
         this.ticketRepository = ticketRepository;
-        this.seatRepository = seatRepository;
         this.showtimeRepository = showtimeRepository;
+        this.seatRepository = seatRepository;
     }
 
-
-    @Transactional
-    public Ticket bookTicket(Showtime showtime, Seat seat, Double price) {
-        // Reload với pessimistic lock để ngăn race condition
-        showtime = showtimeRepository.findByIdWithLock(showtime.getId())
-                .orElseThrow(() -> new RuntimeException("Suất chiếu không hợp lệ!"));
-        seat = seatRepository.findByIdWithLock(seat.getId())
-                .orElseThrow(() -> new RuntimeException("Ghế không hợp lệ!"));
-        
-        boolean isSeatTaken = ticketRepository.existsByShowtimeIdAndSeatId(showtime.getId(), seat.getId());
-        if(isSeatTaken) {
-            throw new SeatAlreadyBookedException("Ghế đã bị đặt, vui lòng chọn ghế khác!");
-        }
-//        tạo đối tượng ticket trạng thái giữ chỗ
-        Ticket ticket = new Ticket();
-        ticket.setShowtime(showtime);
-        ticket.setSeat(seat);
-        ticket.setPrice(price);
-        ticket.setBookingTime(LocalDateTime.now());
-        ticket.setStatus("HOLDING");
-        ticket.setExpiryTime(LocalDateTime.now().plusMinutes(1)); // trạng thái chờ người dùng đặt vé trong 1 phút
-
-        try {
-//            lưu xuống db
-            ticket.setUserId(1L);
-            return ticketRepository.save(ticket);
-        } catch (DataIntegrityViolationException e) {
-            throw new SeatAlreadyBookedException("Ghế đã có người đặt trước đó, vui lòng chọn ghế khác!");
-        }
+    private double resolvePrice(Seat seat) {
+        return SEAT_TYPE_PRICE.getOrDefault(seat.getSeatType(), DEFAULT_SEAT_PRICE);
     }
+
 
         @Transactional
-    public Ticket bookTicketByIds(Long showtimeId, Long seatId, Double price, Long userId) {
+    public Ticket bookTicketByIds(Long showtimeId, Long seatId, Long userId) {
         // Dùng pessimistic lock để ngăn race condition giữa 2 luồng
         Showtime showtime = showtimeRepository.findByIdWithLock(showtimeId)
                 .orElseThrow(() -> new RuntimeException("Suất chiếu không hợp lệ!"));
-        
+
         Seat seat = seatRepository.findByIdWithLock(seatId)
                 .orElseThrow(() -> new RuntimeException("Ghế không hợp lệ!"));
 
@@ -84,7 +66,7 @@ public class TicketService {
         Ticket ticket = new Ticket();
         ticket.setShowtime(showtime);
         ticket.setSeat(seat);
-        ticket.setPrice(price);
+        ticket.setPrice(resolvePrice(seat));
         ticket.setBookingTime(LocalDateTime.now());
         ticket.setStatus("HOLDING");
         ticket.setExpiryTime(LocalDateTime.now().plusMinutes(15)); // 15 phút để hoàn tất thanh toán
@@ -98,23 +80,38 @@ public class TicketService {
     }
 
     @Transactional
-    public Ticket confirmePayment(Long ticketId) {
+    public Ticket confirmePayment(Long ticketId, Long requestingUserId) {
 
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new RuntimeException("Không tìm thấy vé đã đặt!"));
 
-//        kiểm tra vé còn trong thời gian holding không
-        if("HOLDING".equals(ticket.getStatus()) && ticket.getExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Thời gian đặt vé đã hết, vui lòng thực hiện lại!");
+        //chống IDOR: chính chủ của vé mới được thanh toán
+        if(ticket.getUserId() == null ||
+                !ticket.getUserId().equals(requestingUserId)) {
+            throw new TicketAccessDeniedException("Bạn không có quyền thanh toán vé này!");
         }
 
-//        cập nhật trạng thái và sinh mã vé
+        //nếu đã confirmed thì trả về nguyên trạng, không sinh mã mới để ghi đè mã cũ
+        if("CONFIRMED".equals(ticket.getStatus())) {
+            return ticket;
+        }
+
+        if("CANCELLED".equals(ticket.getStatus())) {
+            throw new RuntimeException("Vé đã bị hủy, không thể thanh toán!");
+        }
+
+        // kiểm tra vé có còn trong trạng thái holding không
+        if("HOLDING".equals(ticket.getStatus()) && ticket.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Thời gian đặt vé đã hết, vui lòng thực hiện thanh toán lại!");
+        }
+
+        // cập nhật trạng thái và sinh mã vé mới
         ticket.setStatus("CONFIRMED");
 
-//        sinh mã ngẫu nhiên với 6 ký tự
+        // sinh mã ngẫu nhiên với 6 ký tự
         String randomCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         ticket.setBookingCode("CT-" + randomCode);
 
-//        lưu lại vào db
+        // lưu lại vào db
         return ticketRepository.save(ticket);
     }
 
@@ -122,29 +119,29 @@ public class TicketService {
 //    LOGIC: xử lý sơ đồ ghế động
 //    lấy toàn bộ ghế so sánh với danh sách từ db
 //    gán trạng thái sáng/tối màu cho ghế
-
     public List<SeatStatusResponse> getSeatFlowByShowtime(Long showtimeId) {
-//       lấy danh sách vé còn hiệu lực(HOLDING chưa hết hạn hoặc CONFIRMED) của suất chiếu này
+
+        //lấy danh sách vé còn hiệu lực của suất chiếu
         List<Ticket> validTickets = ticketRepository.findValidTicketsByShowtime(showtimeId, LocalDateTime.now());
 
-//        chuyển danh sách vé thành Map với key là seatId để tìm kiếm với độ phức tạp 0(1)
-        Map<Long, String> seatStatusMap = validTickets.stream().collect(Collectors.toMap(t -> t.getSeat().getId(), Ticket::getStatus));
+        //chuyển danh sách vé thành map với key là seatId để tìm kiếm với mức độ phức tạp O(1)
+        Map<Long, String> seatStatusMap = validTickets.stream().collect(Collectors.toMap(ticket -> ticket.getSeat().getId(), Ticket::getStatus));
 
-//        tìm suất chiếu thuộc phòng chiếu nào
-        Showtime showtime = showtimeRepository.findById(showtimeId).orElseThrow(() -> new RuntimeException("Suất chiếu không hợp lệ!"));
+        //tìm suất chiếu thuộc phòng chiếu nào
+        Showtime showtime = showtimeRepository.findById(showtimeId).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy suất chiếu!"));
         Long roomId = showtime.getRoom().getId();
 
-//        lấy toàn bộ danh sách ghế của phòng chiếu
+        //lấy danh sách ghế của phòng chiếu
         List<Seat> allSeatsInRoom = seatRepository.findByRoomId(roomId);
 
-//        duyệt qua từng ghế để phân loại trạng thái sáng/tối màu
+        // duyệt qua từng ghế để phân loại trạng thái sáng/tối
         List<SeatStatusResponse> layout = new ArrayList<>();
-        for(Seat seat : allSeatsInRoom) {
-//            mặc định ghế trống ban đầu(màu sáng)
+        for (Seat seat : allSeatsInRoom) {
+            //mặc định = trắng
             String status = "AVAILABLE";
 
-//            kiểm tra: nếu ghế nằm trong Map vé thì lấy trạng thái của vé đó(HOLDING/CONFIRMED)
-            if(seatStatusMap.containsKey(seat.getId())) {
+            //kiểm tra: nếu ghế nằm trong map thì lấy trạng thái của vé đó(holding/confirmed), nếu không thì vẫn là AVAILABLE
+            if (seatStatusMap.containsKey(seat.getId())) {
                 status = seatStatusMap.get(seat.getId());
             }
             layout.add(new SeatStatusResponse(seat.getId(), seat.getSeatNumber(), seat.getSeatType(), status));
@@ -152,4 +149,5 @@ public class TicketService {
 
         return layout;
     }
+
 }

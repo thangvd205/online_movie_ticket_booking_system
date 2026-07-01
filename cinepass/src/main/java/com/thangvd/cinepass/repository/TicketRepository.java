@@ -15,22 +15,16 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     boolean existsByShowtimeIdAndSeatId(Long showtimeId, Long seatId);
 
-    @Modifying
-    @Query("DELETE FROM Ticket t WHERE t.status = ?1 AND t.expiryTime < ?2")
-    void deleteByStatusAndExpiryTimeBefore(String status, LocalDateTime now);
-
-//    thêm truy vấn: lấy danh sách vé hợp lệ(đã confirmed hoặc đang holding chưa hết hạn)
+    // lấy danh sách vé hợp lệ
     @Query("SELECT t FROM Ticket t WHERE t.showtime.id = :showtimeId " +
             "AND (t.status = 'CONFIRMED' OR (t.status = 'HOLDING' AND t.expiryTime > :now))")
-    List<Ticket> findValidTicketsByShowtime(@Param("showtimeId") Long ShowtimeId, @Param("now") LocalDateTime now);
+    List<Ticket> findValidTicketsByShowtime(@Param("showtimeId") Long showtimeId, @Param("now") LocalDateTime now);
 
-
-//    lịch sử vé của người dùng
+    //lịch sử vé người dùng
     List<Ticket> findByUserIdOrderByIdDesc(Long userId);
-//    tìm các vé quá hạn để xử lý logic
-    List<Ticket> findByStatusAndBookingTimeBefore(String status, LocalDateTime time);
-//    tối ưu perform: ép trạng thái vé hết hạn hàng loạt
+
+    //tối ưu performance: ép trạng thái về hết hạn hàng loạt, dựa trên expiryTime từng vé
     @Modifying
-    @Query("UPDATE Ticket t SET t.status = 'CANCELLED' WHERE t.status = 'HOLDING' AND t.bookingTime < :threshold")
-    int cancelExpiredTicketsBulk(@Param("threshold") LocalDateTime threshold);
+    @Query("UPDATE Ticket t SET t.status = 'CANCELLED' WHERE t.status = 'HOLDING' AND t.expiryTime <= :now")
+    int cancelExpiredTicketsBulk(@Param("now") LocalDateTime now);
 }

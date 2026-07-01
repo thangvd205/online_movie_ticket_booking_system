@@ -25,7 +25,7 @@ public class AuthService {
 
     public AppUser register(String username, String rawPassword) {
         if (userRepository.findByUsername(username).isPresent()) {
-            throw new RuntimeException("Tên người dùng đã tồn tại");
+            throw new com.thangvd.cinepass.exception.DuplicateUsernameException("Tên người dùng đã tồn tại");
         }
         AppUser user = new AppUser();
         user.setUsername(username);
@@ -37,7 +37,6 @@ public class AuthService {
     public String login(String username, String password) {
         Authentication auth = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
         AppUser user = userRepository.findByUsername(username).orElseThrow();
-        return jwtUtil.generateToken(username, user.getId());
+        return jwtUtil.generateToken(username, user.getId(), user.getRoles());
     }
 }
-

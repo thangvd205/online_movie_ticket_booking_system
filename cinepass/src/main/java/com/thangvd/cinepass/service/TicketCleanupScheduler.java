@@ -12,24 +12,24 @@ import java.time.LocalDateTime;
 @Component
 public class TicketCleanupScheduler {
 
-   private final TicketRepository ticketRepository;
-   private final SeatRepository seatRepository;
+    private final TicketRepository ticketRepository;
+    private final SeatRepository seatRepository;
 
-   public TicketCleanupScheduler(TicketRepository ticketRepository,
-                                 SeatRepository seatRepository) {
-       this.ticketRepository = ticketRepository;
-       this.seatRepository = seatRepository;
-   }
+    public TicketCleanupScheduler(TicketRepository ticketRepository,
+                                  SeatRepository seatRepository) {
+        this.ticketRepository = ticketRepository;
+        this.seatRepository = seatRepository;
+    }
 
-   @Scheduled(fixedRate = 60000)
-   @Transactional
-   public void cleanupExpiredTicket() {
-       LocalDateTime threshold = LocalDateTime.now().minusMinutes(1);
+    @Scheduled(fixedRate = 60000)
+    @Transactional
+    public void cleanupExpiredTicket() {
+        // Huy dua tren expiryTime that su cua tung ve (do khi dat ve quy dinh, hien la 15 phut),
+        // khong con dung nguong 1 phut co dinh nhu truoc.
+        int updateCount = ticketRepository.cancelExpiredTicketsBulk(LocalDateTime.now());
 
-       int updateCount = ticketRepository.cancelExpiredTicketsBulk(threshold);
-
-       if (updateCount > 0) {
-           System.out.println("Đã hủy tự động " + updateCount + " vé quá hạn giữ chỗ!");
-       }
-   }
+        if (updateCount > 0) {
+            System.out.println("Đã hủy tự động " + updateCount + " vé quá hạn giữ chỗ!");
+        }
+    }
 }

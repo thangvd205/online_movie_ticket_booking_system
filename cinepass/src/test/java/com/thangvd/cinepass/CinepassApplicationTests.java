@@ -1,10 +1,9 @@
 package com.thangvd.cinepass;
 
 import com.thangvd.cinepass.exception.SeatAlreadyBookedException;
-import com.thangvd.cinepass.model.Cinema;
-import com.thangvd.cinepass.model.Room;
-import com.thangvd.cinepass.model.Seat;
-import com.thangvd.cinepass.model.Showtime;
+import com.thangvd.cinepass.exception.SeatAlreadyBookedException;
+import com.thangvd.cinepass.exception.TicketAccessDeniedException;
+import com.thangvd.cinepass.model.*;
 import com.thangvd.cinepass.repository.*;
 import com.thangvd.cinepass.service.TicketService;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +18,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 class CinepassApplicationTests {
@@ -39,36 +40,36 @@ class CinepassApplicationTests {
     private Showtime savedShowtime;
     private Seat savedSeat;
 
-     @Transactional
-     @BeforeEach
-     void setUpData() {
-         ticketRepository.deleteAll();
-         showtimeRepository.deleteAll();
-         seatRepository.deleteAll();
-         roomRepository.deleteAll();
-         cinemaRepository.deleteAll();
+    @Transactional
+    @BeforeEach
+    void setUpData() {
+        ticketRepository.deleteAll();
+        showtimeRepository.deleteAll();
+        seatRepository.deleteAll();
+        roomRepository.deleteAll();
+        cinemaRepository.deleteAll();
 
-         Cinema cinema = new Cinema("CinePass Cinema 2026", "123 Đường Phố, TP HCM");
-         Cinema savedCinema = cinemaRepository.save(cinema);
+        Cinema cinema = new Cinema("CinePass Cinema 2026", "123 Đường Phố, TP HCM");
+        Cinema savedCinema = cinemaRepository.save(cinema);
 
-         Room room = new Room("Phòng A", 100, savedCinema);
-         Room savedRoom = roomRepository.save(room);
+        Room room = new Room("Phòng A", 100, savedCinema);
+        Room savedRoom = roomRepository.save(room);
 
-         Showtime dummyShowtime = new Showtime();
-         dummyShowtime.setMovieTitle("Phim Bom Tấn CinePass 2026");
-         dummyShowtime.setStartTime(LocalDateTime.now());
-         dummyShowtime.setRoom(savedRoom);
-         this.savedShowtime = showtimeRepository.save(dummyShowtime);
+        Showtime dummyShowtime = new Showtime();
+        dummyShowtime.setMovieTitle("Phim Bom Tấn CinePass 2026");
+        dummyShowtime.setStartTime(LocalDateTime.now());
+        dummyShowtime.setRoom(savedRoom);
+        this.savedShowtime = showtimeRepository.save(dummyShowtime);
 
-         Seat dummySeat = new Seat();
-         dummySeat.setSeatNumber("A1");
-         dummySeat.setSeatType("VIP");
-         dummySeat.setRoom(savedRoom);
-         this.savedSeat = seatRepository.save(dummySeat);
-     }
+        Seat dummySeat = new Seat();
+        dummySeat.setSeatNumber("A1");
+        dummySeat.setSeatType("VIP");
+        dummySeat.setRoom(savedRoom);
+        this.savedSeat = seatRepository.save(dummySeat);
+    }
 
-     @Test
-     void testConcurrentBooking() throws InterruptedException {
+    @Test
+    void testConcurrentBooking() throws InterruptedException {
         // Kiểm tra log để chắc chắn data mồi đã lên
         System.out.println("====== ĐÃ KHỞI TẠO SHOWTIME ID THỰC TẾ: " + savedShowtime.getId());
 
@@ -88,13 +89,16 @@ class CinepassApplicationTests {
                 try {
                     startLatch.await(); // Đứng đợi lệnh phát súng
 
-                    // Truyền đối tượng đã được lưu thực tế trong DB vào
-                    ticketService.bookTicket(savedShowtime, savedSeat, 100000.0);
-                    successCount.incrementAndGet();
+                    //dùng api mà controller thật sự gọi(bookTicketById), userId giả lập = 1L
+                    ticketService.bookTicketByIds(savedShowtime.getId(), savedSeat.getId(), 1L);
+                    successCount.incrementAndGet(); // Đặt ghế thành công
+
                 } catch (SeatAlreadyBookedException e) {
                     faildCount.incrementAndGet(); // Bị chặn do tranh chấp ghi trùng ghế
+
                 } catch (Exception e) {
                     e.printStackTrace();
+
                 } finally {
                     endLatch.countDown(); // Báo cáo cho endLatch biết luồng này đã chạy xong
                 }
@@ -116,21 +120,50 @@ class CinepassApplicationTests {
 
             // Kiểm tra tính toàn vẹn dữ liệu: Hệ thống chịu tải đa luồng chuẩn thì chỉ được phép có duy nhất 1 vé tạo thành công
             long ticketCount = ticketRepository.count();
-            org.junit.jupiter.api.Assertions.assertEquals(1, ticketCount, "Thất bại: Số lượng vé lưu trong DB phải đúng bằng 1!");
+            assertEquals(1, ticketCount, "Chỉ có duy nhất 1 vé được tạo thành công trong điều kiện tranh chấp đa luồng!");
         } finally {
             executor.shutdown();
         }
-     }
+    }
 
-     @Transactional
-     @AfterEach
-     void tearDown() {
-         // Xóa sạch dữ liệu mồi sau mỗi test
-         ticketRepository.deleteAll();
-         showtimeRepository.deleteAll();
-         seatRepository.deleteAll();
-         roomRepository.deleteAll();
-         cinemaRepository.deleteAll();
-     }
+    @Test
+    void testTicketPriceIsComputedByServerNotByClient() {
+        // mặc định server ghế vip = 150k không liên quan giá client gửi lên
+        Ticket ticket = ticketService.bookTicketByIds(savedShowtime.getId(), savedSeat.getId(), 1L);
+        assertEquals(150000.0, ticket.getPrice(), "Giá vé phải được tính toán bởi server, không phụ thuộc giá client gửi lên!");
+    }
 
+    @Test
+     void testConfirmPaymentRejectsWhenNotOwner() {
+
+        //user1 đặt vé
+        Ticket ticket = ticketService.bookTicketByIds(savedShowtime.getId(), savedSeat.getId(), 1L);
+
+        //user2 không được phép xác nhận thanh toán vé của user1
+        assertThrows(TicketAccessDeniedException.class, () -> ticketService.confirmePayment(ticket.getId(),2L));
+    }
+
+    @Test
+    void testConfirmPaymentSucceedsForOwnerAndIsIdempotent() {
+        Ticket ticket = ticketService.bookTicketByIds(savedShowtime.getId(), savedSeat.getId(), 1L);
+        Ticket confirmed = ticketService.confirmePayment(ticket.getId(), 1L);
+        assertEquals("CONFIRMED", confirmed.getStatus());
+        String firstBookingCode = confirmed.getBookingCode();
+        assertNotNull(firstBookingCode);
+
+        // gọi confirm lần 2 không sinh mã vé mới
+        Ticket confirmedAgain = ticketService.confirmePayment(ticket.getId(), 1L);
+        assertEquals(firstBookingCode, confirmedAgain.getBookingCode());
+    }
+
+    @Transactional
+    @AfterEach
+    void tearDown() {
+        //xóa dữ liệu mồi sau khi test xong để tránh ảnh hưởng các test khác
+        ticketRepository.deleteAll();
+        showtimeRepository.deleteAll();
+        seatRepository.deleteAll();
+        roomRepository.deleteAll();
+        cinemaRepository.deleteAll();
+    }
 }

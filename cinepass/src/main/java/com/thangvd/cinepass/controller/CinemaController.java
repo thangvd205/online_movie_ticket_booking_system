@@ -4,6 +4,8 @@ import com.thangvd.cinepass.dto.ApiResponse;
 import com.thangvd.cinepass.dto.CinemaRequest;
 import com.thangvd.cinepass.dto.CinemaResponse;
 import com.thangvd.cinepass.service.CinemaService;
+import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,21 +33,25 @@ public class CinemaController {
         return ApiResponse.success(cinema, "Lấy thông tin rạp thành công!");
     }
 
-//    3 thêm mới rạp phim
+//    3 thêm mới rạp phim - role admin
     @PostMapping
-    public ApiResponse<CinemaResponse> createCinema(@RequestBody CinemaRequest request) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<CinemaResponse> createCinema(@RequestBody @Valid CinemaRequest request) {
         CinemaResponse newCinema = cinemaService.createCinema(request);
         return ApiResponse.success(newCinema, "Thêm rạp phim thành công!");
     }
 
-//    4 cập nhật rạp phim
+//    4 cập nhật rạp phim - role admin
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ApiResponse<CinemaResponse> updateCinema(@PathVariable Long id, @RequestBody CinemaRequest request) {
+    public ApiResponse<CinemaResponse> updateCinema(@PathVariable Long id,
+                                                    @Valid @RequestBody CinemaRequest request) {
         CinemaResponse updateCinema = cinemaService.updatedCinema(id, request);
         return ApiResponse.success(updateCinema, "Cập nhật thông tin rạp thành công!");
     }
 
-//    5 xóa rạp phim
+//    5 xóa rạp phim - role admin
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ApiResponse<CinemaResponse> deleteCinema(@PathVariable Long id) {
         cinemaService.deleteCinema(id);

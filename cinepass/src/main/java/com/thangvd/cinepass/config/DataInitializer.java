@@ -1,6 +1,7 @@
 package com.thangvd.cinepass.config;
 
 
+import com.thangvd.cinepass.model.AppUser;
 import com.thangvd.cinepass.model.Cinema;
 import com.thangvd.cinepass.model.Room;
 import com.thangvd.cinepass.model.Seat;
@@ -9,16 +10,43 @@ import com.thangvd.cinepass.repository.CinemaRepository;
 import com.thangvd.cinepass.repository.RoomRepository;
 import com.thangvd.cinepass.repository.SeatRepository;
 import com.thangvd.cinepass.repository.ShowtimeRepository;
+import com.thangvd.cinepass.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 
 @Configuration
 public class DataInitializer {
 
+    // Tao san 1 tai khoan ADMIN neu he thong chua co ai mang role nay, de cac API
+    // yeu cau hasRole("ADMIN") (vd quan ly rap) co the su dung ngay tu dau.
+    // Doi mat khau nay bang bien moi truong ADMIN_USERNAME / ADMIN_PASSWORD khi deploy that.
     @Bean
+    @Order(1)
+    CommandLineRunner initAdminUser(UserRepository userRepository,
+                                    PasswordEncoder passwordEncoder,
+                                    @Value("${app.admin.default-username}") String adminUsername,
+                                    @Value("${app.admin.default-password}") String adminPassword) {
+        return args -> {
+            boolean hasAdmin = userRepository.findByUsername(adminUsername).isPresent();
+            if (!hasAdmin) {
+                AppUser admin = new AppUser();
+                admin.setUsername(adminUsername);
+                admin.setPassword(passwordEncoder.encode(adminPassword));
+                admin.setRoles("ROLE_USER,ROLE_ADMIN");
+                userRepository.save(admin);
+                System.out.println("Đã tạo tài khoản admin mặc định: " + adminUsername);
+            }
+        };
+    }
+
+    @Bean
+    @Order(2)
     CommandLineRunner initDatabase(CinemaRepository cinemaRepository,
                                    RoomRepository roomRepository,
                                    ShowtimeRepository showtimeRepository,
