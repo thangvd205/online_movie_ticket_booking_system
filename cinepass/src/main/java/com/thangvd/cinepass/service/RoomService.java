@@ -32,7 +32,7 @@ public class RoomService {
         }
 
         return roomRepository.findByCinemaId(cinemaId).stream()
-                .map(room -> new RoomResponse(room.getId(), room.getName(), room.getTotalseats(),
+                .map(room -> new RoomResponse(room.getId(), room.getName(), room.getTotalSeats(),
                         room.getCinema().getName())).collect(Collectors.toList());
     }
 
@@ -44,7 +44,7 @@ public class RoomService {
         Room room = new Room(request.getName(), request.getTotalSeats(), cinema);
         Room savedRoom = roomRepository.save(room);
 
-        return new RoomResponse(savedRoom.getId(), savedRoom.getName(), savedRoom.getTotalseats(), cinema.getName());
+        return new RoomResponse(savedRoom.getId(), savedRoom.getName(), savedRoom.getTotalSeats(), cinema.getName());
     }
 
 //    3 xóa phòng chiếu

@@ -16,7 +16,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     boolean existsByShowtimeIdAndSeatId(Long showtimeId, Long seatId);
 
     @Modifying
-    @Query
+    @Query("DELETE FROM Ticket t WHERE t.status = ?1 AND t.expiryTime < ?2")
     void deleteByStatusAndExpiryTimeBefore(String status, LocalDateTime now);
 
 //    thêm truy vấn: lấy danh sách vé hợp lệ(đã confirmed hoặc đang holding chưa hết hạn)
